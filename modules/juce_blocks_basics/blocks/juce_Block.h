@@ -20,9 +20,13 @@
   ==============================================================================
 */
 
+namespace juce
+{
 
 /**
     Represents an individual BLOCKS device.
+
+    @tags{Blocks}
 */
 class Block   : public juce::ReferenceCountedObject
 {
@@ -32,17 +36,17 @@ public:
     virtual ~Block();
 
     /** The different block types.
-
         @see Block::getType()
     */
     enum Type
     {
-        unknown = 0,
-        lightPadBlock,
-        liveBlock,
-        loopBlock,
-        developerControlBlock,
-        seaboardBlock // on-screen seaboard view
+        unknown = 0,           /**< Unknown block type.           */
+        lightPadBlock,         /**< Lightpad block type.          */
+        liveBlock,             /**< Live control block type.      */
+        loopBlock,             /**< Loop control block type.      */
+        developerControlBlock, /**< Developer control block type. */
+        touchBlock,            /**< Touch control block type.     */
+        seaboardBlock          /**< Seaboard block type.          */
     };
 
     /** The Block class is reference-counted, so always use a Block::Ptr when
@@ -58,17 +62,28 @@ public:
     /** The Block's serial number. */
     const juce::String serialNumber;
 
+    /** The Block's version number */
+    juce::String versionNumber;
+
+    /** The Block's name */
+    juce::String name;
+
+    /** This type is used for the unique block identifier. */
     using UID = uint64;
 
     /** This Block's UID.
-
         This will be globally unique, and remains constant for a particular device.
     */
     const UID uid;
 
     //==============================================================================
-    /** Returns the type of this device.
+    /** Two blocks are considered equal if they have the same UID. */
+    bool operator== (const Block& other) const noexcept     { return uid == other.uid; }
+    /** Two blocks are considered equal if they have the same UID. */
+    bool operator!= (const Block& other) const noexcept     { return uid != other.uid; }
 
+    //==============================================================================
+    /** Returns the type of this device.
         @see Block::Type
     */
     virtual Type getType() const = 0;
@@ -257,12 +272,136 @@ public:
     virtual void saveProgramAsDefault() = 0;
 
     //==============================================================================
+    /** Metadata for a given config item */
+    struct ConfigMetaData
+    {
+        static constexpr int32 numOptionNames = 8;
+
+        ConfigMetaData() {}
+
+        // Constructor to work around VS2015 bugs...
+        ConfigMetaData (uint32 itemIndex,
+                        int32 itemValue,
+                        juce::Range<int32> rangeToUse,
+                        bool active,
+                        const char* itemName,
+                        uint32 itemType,
+                        const char* options[ConfigMetaData::numOptionNames],
+                        const char* groupName)
+          : item (itemIndex),
+            value (itemValue),
+            range (rangeToUse),
+            isActive (active),
+            name (itemName),
+            type (itemType),
+            group (groupName)
+        {
+            for (int i = 0; i < numOptionNames; ++i)
+                optionNames[i] = options[i];
+        }
+
+        ConfigMetaData (const ConfigMetaData& other)
+        {
+            *this = other;
+        }
+
+        const ConfigMetaData& operator= (const ConfigMetaData& other)
+        {
+            if (this != &other)
+            {
+                item     = other.item;
+                value    = other.value;
+                range    = other.range;
+                isActive = other.isActive;
+                name     = other.name;
+                type     = other.type;
+                group    = other.group;
+
+                for (int i = 0; i < numOptionNames; ++i)
+                    optionNames[i] = other.optionNames[i];
+            }
+
+            return *this;
+        }
+
+        bool operator== (const ConfigMetaData& other) const
+        {
+            for (int32 optionIndex = 0; optionIndex < numOptionNames; ++optionIndex)
+                if (optionNames[optionIndex] != other.optionNames[optionIndex])
+                    return false;
+
+            return item     == other.item
+                && value    == other.value
+                && range    == other.range
+                && isActive == other.isActive
+                && name     == other.name
+                && group    == other.group;
+        }
+
+        bool operator != (const ConfigMetaData& other) const
+        {
+            return ! (*this == other);
+        }
+
+        uint32 item = 0;
+        int32 value = 0;
+        juce::Range<int32> range;
+        bool isActive = false;
+        juce::String name;
+        uint32 type = 0;
+        juce::String optionNames[numOptionNames] = {};
+        juce::String group;
+    };
+
+    /** Returns the maximum number of config items available */
+    virtual uint32 getMaxConfigIndex() = 0;
+
+    /** Determine if this is a valid config item index */
+    virtual bool isValidUserConfigIndex (uint32 item) = 0;
+
+    /** Get local config item value */
+    virtual int32 getLocalConfigValue (uint32 item) = 0;
+
+    /** Set local config item value */
+    virtual void setLocalConfigValue (uint32 item, int32 value) = 0;
+
+    /** Set local config item range */
+    virtual void setLocalConfigRange (uint32 item, int32 min, int32 max) = 0;
+
+    /** Set if config item is active or not */
+    virtual void setLocalConfigItemActive (uint32 item, bool isActive) = 0;
+
+    /** Determine if config item is active or not */
+    virtual bool isLocalConfigItemActive (uint32 item) = 0;
+
+    /** Get config item metadata */
+    virtual ConfigMetaData getLocalConfigMetaData (uint32 item) = 0;
+
+    /** Request sync of factory config with block */
+    virtual void requestFactoryConfigSync() = 0;
+
+    /** Reset all items active status */
+    virtual void resetConfigListActiveStatus() = 0;
+
+    /** Perform factory reset on Block */
+    virtual void factoryReset() = 0;
+
+    /** Reset this Block */
+    virtual void blockReset() = 0;
+
+    /** Set Block name */
+    virtual bool setName (const juce::String& name) = 0;
+
+    //==============================================================================
     /** Allows the user to provide a function that will receive log messages from the block. */
     virtual void setLogger (std::function<void(const String&)> loggingCallback) = 0;
 
     /** Sends a firmware update packet to a block, and waits for a reply. Returns an error code. */
     virtual bool sendFirmwareUpdatePacket (const uint8* data, uint8 size,
-                                           std::function<void (uint8)> packetAckCallback) = 0;
+                                           std::function<void (uint8, uint32)> packetAckCallback) = 0;
+
+    /** Provides a callback that will be called when a config changes. */
+    virtual void setConfigChangedCallback (std::function<void(Block&, const ConfigMetaData&, uint32)>) = 0;
 
     //==============================================================================
     /** Interface for objects listening to input data port. */
@@ -292,6 +431,7 @@ public:
 protected:
     //==============================================================================
     Block (const juce::String& serialNumberToUse);
+    Block (const juce::String& serial, const juce::String& version, const juce::String& name);
 
     juce::ListenerList<DataInputPortListener> dataInputPortListeners;
     juce::ListenerList<ProgramEventListener> programEventListeners;
@@ -300,3 +440,5 @@ private:
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Block)
 };
+
+} // namespace juce

@@ -20,6 +20,8 @@
   ==============================================================================
 */
 
+namespace juce
+{
 
 static Block::UID getBlockUIDFromSerialNumber (const uint8* serial) noexcept
 {
@@ -49,6 +51,11 @@ static Block::UID getBlockUIDFromSerialNumber (const juce::String& serial) noexc
 
 Block::Block (const juce::String& serial)
    : serialNumber (serial), uid (getBlockUIDFromSerialNumber (serial))
+{
+}
+
+Block::Block (const juce::String& serial, const juce::String& version, const juce::String& blockName)
+   : serialNumber (serial), versionNumber (version), name (blockName), uid (getBlockUIDFromSerialNumber (serial))
 {
 }
 
@@ -99,3 +106,5 @@ LEDRow::~LEDRow() {}
 //==============================================================================
 StatusLight::StatusLight (Block& b) : block (b) {}
 StatusLight::~StatusLight() {}
+
+} // namespace juce

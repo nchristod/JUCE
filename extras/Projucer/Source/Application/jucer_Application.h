@@ -29,9 +29,10 @@
 #include "jucer_MainWindow.h"
 #include "../Project/jucer_Module.h"
 #include "jucer_AutoUpdater.h"
-#include "../Code Editor/jucer_SourceCodeEditor.h"
-#include "../Utility/jucer_ProjucerLookAndFeel.h"
+#include "../CodeEditor/jucer_SourceCodeEditor.h"
+#include "../Utility/UI/jucer_ProjucerLookAndFeel.h"
 #include "../Licenses/jucer_LicenseController.h"
+#include "jucer_ProjucerAnalytics.h"
 
 struct ChildProcessCache;
 
@@ -75,7 +76,9 @@ public:
     void createBuildMenu (PopupMenu&);
     void createColourSchemeItems (PopupMenu&);
     void createWindowMenu (PopupMenu&);
+    void createDocumentMenu (PopupMenu&);
     void createToolsMenu (PopupMenu&);
+    void createHelpMenu (PopupMenu&);
     void createExtraAppleMenuItems (PopupMenu&);
     void handleMainMenuCommand (int menuItemID);
 
@@ -86,13 +89,16 @@ public:
 
     //==============================================================================
     void createNewProject();
+    void createNewProjectFromClipboard();
     void updateNewlyOpenedProject (Project&);
     void askUserToOpenFile();
     bool openFile (const File&);
     bool closeAllDocuments (bool askUserToSave);
     bool closeAllMainWindows();
+    void closeAllMainWindowsAndQuitIfNeeded();
+    void clearRecentFiles();
 
-    PropertiesFile::Options getPropertyFileOptionsFor (const String& filename);
+    PropertiesFile::Options getPropertyFileOptionsFor (const String& filename, bool isProjectSettings);
 
     //==============================================================================
     void showUTF8ToolWindow();
@@ -102,6 +108,14 @@ public:
     void showApplicationUsageDataAgreementPopup();
     void dismissApplicationUsageDataAgreementPopup();
 
+    void showPathsWindow (bool highlightJUCEPath = false);
+    void showEditorColourSchemeWindow();
+
+    void launchForumBrowser();
+    void launchModulesBrowser();
+    void launchClassesBrowser();
+    void launchTutorialsBrowser();
+
     void updateAllBuildTabs();
     LatestVersionChecker* createVersionChecker() const;
 
@@ -110,6 +124,14 @@ public:
     void doLogout();
 
     bool isPaidOrGPL() const              { return licenseController == nullptr || licenseController->getState().isPaidOrGPL(); }
+
+    //==============================================================================
+    void selectEditorColourSchemeWithName (const String& schemeName);
+    static bool isEditorColourSchemeADefaultScheme (const StringArray& schemes, int editorColourSchemeIndex);
+    static int getEditorColourSchemeForGUIColourScheme (const StringArray& schemes, int guiColourSchemeIndex);
+
+    //==============================================================================
+    void setAnalyticsEnabled (bool);
 
     //==============================================================================
     ProjucerLookAndFeel lookAndFeel;
@@ -124,8 +146,8 @@ public:
     OpenDocumentManager openDocumentManager;
     ScopedPointer<ApplicationCommandManager> commandManager;
 
-    ScopedPointer<Component> appearanceEditorWindow, globalPreferencesWindow, utf8Window,
-                             svgPathWindow, aboutWindow, applicationUsageDataWindow;
+    ScopedPointer<Component> utf8Window, svgPathWindow, aboutWindow, applicationUsageDataWindow,
+                             pathsWindow, editorColourSchemeWindow;
 
     ScopedPointer<FileLogger> logger;
 
@@ -148,4 +170,41 @@ private:
 
     void handleAsyncUpdate() override;
     void initCommandManager();
+
+    void deleteTemporaryFiles() const noexcept;
+
+    void createExamplesPopupMenu (PopupMenu&) noexcept;
+    Array<File> getSortedExampleDirectories() const noexcept;
+    Array<File> getSortedExampleFilesInDirectory (const File&) const noexcept;
+
+    bool findWindowAndOpenPIP (const File&);
+
+    void findAndLaunchExample (int);
+    File findDemoRunnerExecutable() const noexcept;
+    File findDemoRunnerProject() const noexcept;
+    void launchDemoRunner();
+
+    int numExamples = 0;
+    ScopedPointer<AlertWindow> demoRunnerAlert;
+
+   #if JUCE_LINUX
+    ChildProcess makeProcess;
+   #endif
+
+    void resetAnalytics() noexcept;
+    void setupAnalytics();
+
+    void showSetJUCEPathAlert();
+    ScopedPointer<AlertWindow> pathAlert;
+
+    //==============================================================================
+    void setColourScheme (int index, bool saveSetting);
+
+    void setEditorColourScheme (int index, bool saveSetting);
+    void updateEditorColourSchemeIfNeeded();
+
+    int selectedColourSchemeIndex = 0;
+
+    int selectedEditorColourSchemeIndex = 0;
+    int numEditorColourSchemes = 0;
 };

@@ -23,14 +23,16 @@
 
   ==============================================================================
 */
-#include "../jucer_Headers.h"
+#include "../Application/jucer_Headers.h"
 #include "../Application/jucer_Application.h"
-#include "../Project Saving/jucer_ProjectExporter.h"
-#include "../Project/jucer_HeaderComponent.h"
+#include "../ProjectSaving/jucer_ProjectExporter.h"
+#include "../Project/UI/jucer_HeaderComponent.h"
 #include "jucer_LicenseController.h"
 
-#include "jucer_LicenseWebview.h"
-#include "jucer_LicenseThread.h"
+#if ! JUCER_ENABLE_GPL_MODE
+ #include "jucer_LicenseWebview.h"
+ #include "jucer_LicenseThread.h"
+#endif
 
 //==============================================================================
 const char* LicenseState::licenseTypeToString (LicenseState::Type type)
@@ -88,7 +90,7 @@ static LicenseState::ApplicationUsageData getApplicationUsageDataTypeFromValue (
     return LicenseState::ApplicationUsageData::notChosenYet;
 }
 
-//==============================================================================
+#if !JUCER_ENABLE_GPL_MODE
 struct LicenseController::ModalCompletionCallback : ModalComponentManager::Callback
 {
     ModalCompletionCallback (LicenseController& controller) : owner (controller) {}
@@ -97,6 +99,7 @@ struct LicenseController::ModalCompletionCallback : ModalComponentManager::Callb
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ModalCompletionCallback)
 };
+#endif
 
 //==============================================================================
 LicenseController::LicenseController()
@@ -110,8 +113,10 @@ LicenseController::LicenseController()
 
 LicenseController::~LicenseController()
 {
-    thread = nullptr;
+   #if ! JUCER_ENABLE_GPL_MODE
+    thread.reset();
     closeWebview (-1);
+   #endif
 }
 
 LicenseState LicenseController::getState() const noexcept
@@ -136,7 +141,8 @@ void LicenseController::startWebviewIfNeeded()
     if (guiNotInitialisedYet)
     {
         guiNotInitialisedYet = false;
-        listeners.call (&StateChangedCallback::licenseStateChanged, getState());
+        auto stateParam = getState();
+        listeners.call ([&] (StateChangedCallback& l) { l.licenseStateChanged (stateParam); });
     }
 
    #if ! JUCER_ENABLE_GPL_MODE
@@ -150,7 +156,7 @@ void LicenseController::logout()
     jassert (MessageManager::getInstance()->isThisTheMessageThread());
 
    #if ! JUCER_ENABLE_GPL_MODE
-    thread = nullptr;
+    thread.reset();
     updateState ({});
 
    #if ! JUCE_LINUX
@@ -166,7 +172,7 @@ void LicenseController::chooseNewLicense()
     jassert (MessageManager::getInstance()->isThisTheMessageThread());
 
    #if ! JUCER_ENABLE_GPL_MODE
-    thread = nullptr;
+    thread.reset();
     thread = new LicenseThread (*this, true);
    #endif
 }
@@ -176,11 +182,14 @@ void LicenseController::setApplicationUsageDataState (LicenseState::ApplicationU
     if (state.applicationUsageDataState != newState)
     {
         state.applicationUsageDataState = newState;
+        ProjucerApplication::getApp().setAnalyticsEnabled (newState == LicenseState::ApplicationUsageData::enabled);
+
         updateState (state);
     }
 }
 
 //==============================================================================
+#if ! JUCER_ENABLE_GPL_MODE
 void LicenseController::closeWebview (int result)
 {
     if (licenseWebview != nullptr)
@@ -244,14 +253,42 @@ void LicenseController::queryWebview (const String& startURL, const String& valu
         }
     });
 }
+#endif
 
 void LicenseController::updateState (const LicenseState& newState)
 {
     auto& props = ProjucerApplication::getApp().settings->getGlobalProperties();
 
+    auto oldLicenseType = state.type;
+
     state = newState;
     licenseStateToSettings (state, props);
-    listeners.call (&StateChangedCallback::licenseStateChanged, getState());
+    auto stateParam = getState();
+    listeners.call ([&] (StateChangedCallback& l) { l.licenseStateChanged (stateParam); });
+
+    if (oldLicenseType != state.type)
+    {
+        StringPairArray data;
+        data.set ("label", state.licenseTypeToString (state.type));
+
+        Analytics::getInstance()->logEvent ("License Type", data, ProjucerAnalyticsEvent::userEvent);
+    }
+}
+
+LicenseState LicenseController::licenseStateFromOldSettings (XmlElement* licenseXml)
+{
+    LicenseState result;
+    result.type                        = getLicenseTypeFromValue    (licenseXml->getChildElementAllSubText ("type", {}));
+    result.applicationUsageDataState   = getApplicationUsageDataTypeFromValue (licenseXml->getChildElementAllSubText ("applicationUsageData", {}));
+    result.username                    = licenseXml->getChildElementAllSubText ("username", {});
+    result.email                       = licenseXml->getChildElementAllSubText ("email", {});
+    result.authToken                   = licenseXml->getChildElementAllSubText ("authToken", {});
+
+    MemoryOutputStream imageData;
+    Base64::convertFromBase64 (imageData, licenseXml->getChildElementAllSubText ("avatar", {}));
+    result.avatar = ImageFileFormat::loadFrom (imageData.getData(), imageData.getDataSize());
+
+    return result;
 }
 
 LicenseState LicenseController::licenseStateFromSettings (PropertiesFile& props)
@@ -260,15 +297,25 @@ LicenseState LicenseController::licenseStateFromSettings (PropertiesFile& props)
 
     if (licenseXml != nullptr)
     {
+        // this is here for backwards compatibility with old-style settings files using XML text elements
+        if (licenseXml->getChildElementAllSubText ("type", {}) != String())
+        {
+            auto stateFromOldSettings = licenseStateFromOldSettings (licenseXml);
+
+            licenseStateToSettings (stateFromOldSettings, props);
+
+            return stateFromOldSettings;
+        }
+
         LicenseState result;
-        result.type                        = getLicenseTypeFromValue    (licenseXml->getChildElementAllSubText ("type", {}));
-        result.applicationUsageDataState   = getApplicationUsageDataTypeFromValue (licenseXml->getChildElementAllSubText ("applicationUsageData", {}));
-        result.username                    = licenseXml->getChildElementAllSubText ("username", {});
-        result.email                       = licenseXml->getChildElementAllSubText ("email", {});
-        result.authToken                   = licenseXml->getChildElementAllSubText ("authToken", {});
+        result.type                        = getLicenseTypeFromValue    (licenseXml->getStringAttribute ("type", {}));
+        result.applicationUsageDataState   = getApplicationUsageDataTypeFromValue (licenseXml->getStringAttribute ("applicationUsageData", {}));
+        result.username                    = licenseXml->getStringAttribute ("username", {});
+        result.email                       = licenseXml->getStringAttribute ("email", {});
+        result.authToken                   = licenseXml->getStringAttribute ("authToken", {});
 
         MemoryOutputStream imageData;
-        Base64::convertFromBase64 (imageData, licenseXml->getChildElementAllSubText ("avatar", {}));
+        Base64::convertFromBase64 (imageData, licenseXml->getStringAttribute ("avatar", {}));
         result.avatar = ImageFileFormat::loadFrom (imageData.getData(), imageData.getDataSize());
 
         return result;
@@ -286,19 +333,16 @@ void LicenseController::licenseStateToSettings (const LicenseState& state, Prope
         XmlElement licenseXml ("license");
 
         if (auto* typeString = getLicenseStateValue (state.type))
-            licenseXml.createNewChildElement ("type")->addTextElement (typeString);
+            licenseXml.setAttribute ("type", typeString);
 
-        licenseXml.createNewChildElement ("applicationUsageData")->addTextElement (getApplicationUsageDataStateValue (state.applicationUsageDataState));
-
-        licenseXml.createNewChildElement ("username")->addTextElement (state.username);
-        licenseXml.createNewChildElement ("email")   ->addTextElement (state.email);
-
-        // TODO: encrypt authToken
-        licenseXml.createNewChildElement ("authToken")->addTextElement (state.authToken);
+        licenseXml.setAttribute ("applicationUsageData", getApplicationUsageDataStateValue (state.applicationUsageDataState));
+        licenseXml.setAttribute ("username", state.username);
+        licenseXml.setAttribute ("email", state.email);
+        licenseXml.setAttribute ("authToken", state.authToken);
 
         MemoryOutputStream imageData;
         if (state.avatar.isValid() && PNGImageFormat().writeImageToStream (state.avatar, imageData))
-            licenseXml.createNewChildElement ("avatar")->addTextElement (Base64::toBase64 (imageData.getData(), imageData.getDataSize()));
+            licenseXml.setAttribute ("avatar", Base64::toBase64 (imageData.getData(), imageData.getDataSize()));
 
         props.setValue ("license", &licenseXml);
     }

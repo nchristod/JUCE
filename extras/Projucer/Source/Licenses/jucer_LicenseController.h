@@ -94,10 +94,18 @@ public:
 
 private:
     //==============================================================================
+    void updateState (const LicenseState&);
+
+    static LicenseState licenseStateFromOldSettings (XmlElement*);
+    static LicenseState licenseStateFromSettings (PropertiesFile&);
+    static void licenseStateToSettings (const LicenseState&, PropertiesFile&);
+
+   #if ! JUCER_ENABLE_GPL_MODE
+    //==============================================================================
     struct ModalCompletionCallback;
     friend struct ModalCompletionCallback;
 
-    friend class ScopedPointer<LicenseThread>;
+    friend struct ContainerDeletePolicy<LicenseThread>;
     friend struct LicenseThread;
 
     //==============================================================================
@@ -105,15 +113,13 @@ private:
     void modalStateFinished (int);
     void ensureLicenseWebviewIsOpenWithPage (const String&);
     void queryWebview (const String&, const String&, HashMap<String, String>&);
-    void updateState (const LicenseState&);
-
-    static LicenseState licenseStateFromSettings (PropertiesFile&);
-    static void licenseStateToSettings (const LicenseState&, PropertiesFile&);
 
     //==============================================================================
-    LicenseState state;
     ScopedPointer<LicenseThread> thread;
     LicenseWebview* licenseWebview = nullptr;
+   #endif
+
+    LicenseState state;
     ListenerList<LicenseController::StateChangedCallback> listeners;
     bool guiNotInitialisedYet = true;
 

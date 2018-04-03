@@ -24,10 +24,7 @@
   ==============================================================================
 */
 
-#pragma once
 #define JUCE_VSTINTERFACE_H_INCLUDED
-
-#include "../../juce_core/juce_core.h"
 
 using namespace juce;
 
@@ -51,6 +48,10 @@ const int32 juceVstInterfaceVersion = 2400;
 const int32 juceVstInterfaceIdentifier = 0x56737450;    // The "magic" identifier in the SDK is 'VstP'.
 
 //==============================================================================
+/** Structure used for VSTs
+
+    @tags{Audio}
+*/
 struct VstEffectInterface
 {
     int32 interfaceIdentifier;
@@ -143,7 +144,9 @@ enum VstHostToPlugInOpcodes
     plugInOpcodeStopProcess,
     plugInOpcodeSetNumberOfSamplesToProcess,
     plugInOpcodeSetSampleFloatType = plugInOpcodeSetNumberOfSamplesToProcess + 4,
-    plugInOpcodeMaximum = plugInOpcodeSetSampleFloatType
+    pluginOpcodeGetNumMidiInputChannels,
+    pluginOpcodeGetNumMidiOutputChannels,
+    plugInOpcodeMaximum = pluginOpcodeGetNumMidiOutputChannels
 };
 
 
@@ -222,6 +225,10 @@ enum VstPlugInCategory
 };
 
 //==============================================================================
+/** Structure used for VSTs
+
+    @tags{Audio}
+*/
 struct VstEditorBounds
 {
     int16 upper;
@@ -242,6 +249,10 @@ enum VstMaxStringLengths
 };
 
 //==============================================================================
+/** Structure used for VSTs
+
+    @tags{Audio}
+*/
 struct VstPinInfo
 {
     char text[vstMaxParameterOrPinLabelLength];
@@ -259,6 +270,10 @@ enum VstPinInfoFlags
 };
 
 //==============================================================================
+/** Structure used for VSTs
+
+    @tags{Audio}
+*/
 struct VstEvent
 {
     int32 type;
@@ -274,6 +289,10 @@ enum VstEventTypes
     vstSysExEventType = 6
 };
 
+/** Structure used for VSTs
+
+    @tags{Audio}
+*/
 struct VstEventBlock
 {
     int32 numberOfEvents;
@@ -281,6 +300,10 @@ struct VstEventBlock
     VstEvent* events[2];
 };
 
+/** Structure used for VSTs
+
+    @tags{Audio}
+*/
 struct VstMidiEvent
 {
     int32 type;
@@ -301,6 +324,10 @@ enum VstMidiEventFlags
     vstMidiEventIsRealtime = 1
 };
 
+/** Structure used for VSTs
+
+    @tags{Audio}
+*/
 struct VstSysExEvent
 {
     int32 type;
@@ -314,6 +341,10 @@ struct VstSysExEvent
 };
 
 //==============================================================================
+/** Structure used for VSTs
+
+    @tags{Audio}
+*/
 struct VstTimingInformation
 {
     double samplePosition;
@@ -343,7 +374,7 @@ enum VstTimingInformationFlags
     vstTimingInfoFlagNanosecondsValid          = 256,
     vstTimingInfoFlagMusicalPositionValid      = 512,
     vstTimingInfoFlagTempoValid                = 1024,
-    vstTimingInfoFlagLastBarPositionValid      = 2056,
+    vstTimingInfoFlagLastBarPositionValid      = 2048,
     vstTimingInfoFlagLoopPositionValid         = 4096,
     vstTimingInfoFlagTimeSignatureValid        = 8192,
     vstTimingInfoFlagSmpteValid                = 16384,
@@ -370,6 +401,10 @@ enum VstSmpteRates
 };
 
 //==============================================================================
+/** Structure used for VSTs
+
+    @tags{Audio}
+*/
 struct VstIndividualSpeakerInfo
 {
     float azimuthalAngle;
@@ -407,6 +442,10 @@ enum VstIndividualSpeakerType
     vstIndividualSpeakerTypeLFE2
 };
 
+/** Structure used for VSTs
+
+    @tags{Audio}
+*/
 struct VstSpeakerConfiguration
 {
     int32 type;
@@ -449,7 +488,23 @@ enum VstSpeakerConfigurationType
     vstSpeakerConfigTypeLRCLfeLsRsTflTfcTfrTrlTrrLfe2
 };
 
+#if JUCE_BIG_ENDIAN
+ #define JUCE_MULTICHAR_CONSTANT(a, b, c, d) (a | (((uint32) b) << 8) | (((uint32) c) << 16) | (((uint32) d) << 24))
+#else
+ #define JUCE_MULTICHAR_CONSTANT(a, b, c, d) (d | (((uint32) c) << 8) | (((uint32) b) << 16) | (((uint32) a) << 24))
+#endif
+
+enum PresonusExtensionConstants
+{
+    presonusVendorID                = JUCE_MULTICHAR_CONSTANT ('P', 'r', 'e', 'S'),
+    presonusSetContentScaleFactor   = JUCE_MULTICHAR_CONSTANT ('A', 'e', 'C', 's')
+};
+
 //==============================================================================
+/** Structure used for VSTs
+
+    @tags{Audio}
+*/
 struct vst2FxBank
 {
     int32 magic1;

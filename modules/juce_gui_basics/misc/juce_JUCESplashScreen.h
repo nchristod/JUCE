@@ -33,15 +33,19 @@
    under the GPL v3 license.
 
    End User License Agreement: www.juce.com/juce-5-licence
+
   ==============================================================================
 */
 
 // BEGIN SECTION A
 
-#pragma once
+namespace juce
+{
 
 /**
     The standard JUCE splash screen component.
+
+    @tags{GUI}
 */
 class JUCE_API  JUCESplashScreen  : public Component,
                                     private Timer,
@@ -50,6 +54,8 @@ class JUCE_API  JUCESplashScreen  : public Component,
 public:
     JUCESplashScreen (Component& parentToAddTo);
     ~JUCESplashScreen();
+
+    static Drawable* getSplashScreenLogo();
 
 private:
     void paint (Graphics&) override;
@@ -62,12 +68,11 @@ private:
     ScopedPointer<Drawable> content;
     CriticalSection appUsageReporting;
     ComponentAnimator fader;
-
-   #if JUCE_DISPLAY_SPLASH_SCREEN
     bool hasStartedFading = false;
-   #endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (JUCESplashScreen)
 };
 
 // END SECTION A
+
+} // namespace juce

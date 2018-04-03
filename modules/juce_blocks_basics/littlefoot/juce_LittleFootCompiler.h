@@ -20,14 +20,19 @@
   ==============================================================================
 */
 
+#if JUCE_MSVC
+ #pragma warning (push)
+ #pragma warning (disable: 4702)
+#endif
+
 namespace littlefoot
 {
-
-using namespace juce;
 
 /**
     This class compiles littlefoot source code into a littlefoot::Program object
     which can be executed by a littlefoot::Runner.
+
+    @tags{Blocks}
 */
 struct Compiler
 {
@@ -88,6 +93,9 @@ struct Compiler
     Array<uint8> compiledObjectCode;
 
 private:
+
+   #ifndef DOXYGEN
+
     struct Statement;
     struct Expression;
     struct BlockStatement;
@@ -190,8 +198,8 @@ private:
     private:
         String::CharPointerType p;
 
-        static bool isIdentifierStart (const juce_wchar c) noexcept   { return CharacterFunctions::isLetter (c)        || c == '_'; }
-        static bool isIdentifierBody  (const juce_wchar c) noexcept   { return CharacterFunctions::isLetterOrDigit (c) || c == '_'; }
+        static bool isIdentifierStart (juce_wchar c) noexcept   { return CharacterFunctions::isLetter (c)        || c == '_'; }
+        static bool isIdentifierBody  (juce_wchar c) noexcept   { return CharacterFunctions::isLetterOrDigit (c) || c == '_'; }
 
         TokenType matchNextToken()
         {
@@ -242,7 +250,7 @@ private:
 
                 if (*p == '/')
                 {
-                    const juce_wchar c2 = p[1];
+                    auto c2 = p[1];
 
                     if (c2 == '/')  { p = CharacterFunctions::find (p, (juce_wchar) '\n'); continue; }
 
@@ -402,7 +410,7 @@ private:
                 f->block->simplify (*this);
         }
 
-        Function* findFunction (FunctionID functionID) const noexcept
+        const Function* findFunction (FunctionID functionID) const noexcept
         {
             for (auto f : functions)
                 if (f->functionID == functionID)
@@ -411,7 +419,7 @@ private:
             return nullptr;
         }
 
-        NativeFunction* findNativeFunction (FunctionID functionID) const noexcept
+        const NativeFunction* findNativeFunction (FunctionID functionID) const noexcept
         {
             for (auto& f : nativeFunctions)
                 if (f.functionID == functionID)
@@ -1511,6 +1519,15 @@ private:
             cg.continueTarget = oldContinueTarget;
         }
 
+        StatementPtr simplify (SyntaxTreeBuilder& stb) override
+        {
+            initialiser = initialiser->simplify (stb);
+            iterator = iterator->simplify (stb);
+            body = body->simplify (stb);
+            condition = condition->simplify (stb);
+            return this;
+        }
+
         void visitSubStatements (Statement::Visitor& visit) const override
         {
             visit (condition); visit (initialiser); visit (iterator); visit (body);
@@ -1542,6 +1559,14 @@ private:
         }
 
         bool alwaysReturns() const override     { return true; }
+
+        StatementPtr simplify (SyntaxTreeBuilder& stb) override
+        {
+            if (returnValue != nullptr)
+                returnValue = returnValue->simplify (stb);
+
+            return this;
+        }
 
         void visitSubStatements (Statement::Visitor& visit) const override
         {
@@ -2042,6 +2067,9 @@ private:
 
         void emitCast (CodeGenerator& cg, Type destType, int stackDepth) const
         {
+            if (arguments.size() != 1)
+                location.throwError (getTypeName (destType) + " cast operation requires a single argument");
+
             auto* arg = arguments.getReference (0);
             const auto sourceType = arg->getType (cg);
             arg->emit (cg, sourceType, stackDepth);
@@ -2169,6 +2197,12 @@ private:
         if (v.isBool())                 return Type::bool_;
         return Type::void_;
     }
+
+   #endif // ! DOXYGEN
 };
 
 }
+
+#if JUCE_MSVC
+ #pragma warning (pop)
+#endif

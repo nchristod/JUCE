@@ -24,8 +24,8 @@
   ==============================================================================
 */
 
-#pragma once
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -36,9 +36,11 @@
     adjacent rectangles.
 
     @see Rectangle
+
+    @tags{Graphics}
 */
 template <typename ValueType>
-class RectangleList
+class RectangleList  final
 {
 public:
     typedef Rectangle<ValueType> RectangleType;
@@ -53,7 +55,7 @@ public:
     }
 
     /** Creates a list containing just one rectangle. */
-    RectangleList (const RectangleType& rect)
+    RectangleList (RectangleType rect)
     {
         addWithoutMerging (rect);
     }
@@ -80,7 +82,7 @@ public:
 
     //==============================================================================
     /** Returns true if the region is empty. */
-    bool isEmpty() const noexcept                               { return rects.size() == 0; }
+    bool isEmpty() const noexcept                               { return rects.isEmpty(); }
 
     /** Returns the number of rectangles in the list. */
     int getNumRectangles() const noexcept                       { return rects.size(); }
@@ -106,13 +108,13 @@ public:
         The rectangle can have any size and may be empty, but if it's floating point
         then it's expected to not contain any INF values.
     */
-    void add (const RectangleType& rect)
+    void add (RectangleType rect)
     {
         jassert (rect.isFinite()); // You must provide a valid rectangle to this method!
 
         if (! rect.isEmpty())
         {
-            if (rects.size() == 0)
+            if (isEmpty())
             {
                 rects.add (rect);
             }
@@ -122,7 +124,7 @@ public:
 
                 for (int j = rects.size(); --j >= 0;)
                 {
-                    RectangleType& ourRect = rects.getReference (j);
+                    auto& ourRect = rects.getReference (j);
 
                     if (rect.intersects (ourRect))
                     {
@@ -133,19 +135,17 @@ public:
                     }
                 }
 
-                if (anyOverlaps && rects.size() > 0)
+                if (anyOverlaps && ! isEmpty())
                 {
                     RectangleList r (rect);
 
-                    for (int i = rects.size(); --i >= 0;)
+                    for (auto& ourRect : rects)
                     {
-                        const RectangleType& ourRect = rects.getReference (i);
-
                         if (rect.intersects (ourRect))
                         {
                             r.subtract (ourRect);
 
-                            if (r.rects.size() == 0)
+                            if (r.isEmpty())
                                 return;
                         }
                     }
@@ -178,7 +178,7 @@ public:
         The rectangle can have any size and may be empty, but if it's floating point
         then it's expected to not contain any INF values.
     */
-    void addWithoutMerging (const RectangleType& rect)
+    void addWithoutMerging (RectangleType rect)
     {
         jassert (rect.isFinite()); // You must provide a valid rectangle to this method!
 
@@ -193,7 +193,7 @@ public:
     */
     void add (const RectangleList& other)
     {
-        for (const RectangleType* r = other.begin(), * const e = other.end(); r != e; ++r)
+        for (auto& r : other)
             add (*r);
     }
 
@@ -202,25 +202,23 @@ public:
         Any rectangles in the list which overlap this will be clipped and subdivided
         if necessary.
     */
-    void subtract (const RectangleType& rect)
+    void subtract (RectangleType rect)
     {
-        const int originalNumRects = rects.size();
-
-        if (originalNumRects > 0)
+        if (auto numRects = rects.size())
         {
-            const ValueType x1 = rect.getX();
-            const ValueType y1 = rect.getY();
-            const ValueType x2 = x1 + rect.getWidth();
-            const ValueType y2 = y1 + rect.getHeight();
+            auto x1 = rect.getX();
+            auto y1 = rect.getY();
+            auto x2 = x1 + rect.getWidth();
+            auto y2 = y1 + rect.getHeight();
 
-            for (int i = getNumRectangles(); --i >= 0;)
+            for (int i = numRects; --i >= 0;)
             {
-                RectangleType& r = rects.getReference (i);
+                auto& r = rects.getReference (i);
 
-                const ValueType rx1 = r.getX();
-                const ValueType ry1 = r.getY();
-                const ValueType rx2 = rx1 + r.getWidth();
-                const ValueType ry2 = ry1 + r.getHeight();
+                auto rx1 = r.getX();
+                auto ry1 = r.getY();
+                auto rx2 = rx1 + r.getWidth();
+                auto ry2 = ry1 + r.getHeight();
 
                 if (! (x2 <= rx1 || x1 >= rx2 || y2 <= ry1 || y1 >= ry2))
                 {
@@ -294,10 +292,15 @@ public:
     */
     bool subtract (const RectangleList& otherList)
     {
-        for (int i = otherList.rects.size(); --i >= 0 && rects.size() > 0;)
-            subtract (otherList.rects.getReference (i));
+        for (auto& r : otherList)
+        {
+            if (isEmpty())
+                return false;
 
-        return rects.size() > 0;
+            subtract (r);
+        }
+
+        return ! isEmpty();
     }
 
     /** Removes any areas of the region that lie outside a given rectangle.
@@ -309,7 +312,7 @@ public:
 
         @see getIntersectionWith
     */
-    bool clipTo (const RectangleType& rect)
+    bool clipTo (RectangleType rect)
     {
         jassert (rect.isFinite()); // You must provide a valid rectangle to this method!
 
@@ -323,7 +326,7 @@ public:
         {
             for (int i = rects.size(); --i >= 0;)
             {
-                RectangleType& r = rects.getReference (i);
+                auto& r = rects.getReference (i);
 
                 if (! rect.intersectRectangle (r))
                     rects.remove (i);
@@ -347,15 +350,13 @@ public:
     template <typename OtherValueType>
     bool clipTo (const RectangleList<OtherValueType>& other)
     {
-        if (rects.size() == 0)
+        if (isEmpty())
             return false;
 
         RectangleList result;
 
-        for (int j = 0; j < rects.size(); ++j)
+        for (auto& rect : rects)
         {
-            auto& rect = rects.getReference (j);
-
             for (auto& r : other)
             {
                 auto clipped = r.template toType<ValueType>();
@@ -378,24 +379,18 @@ public:
 
         @see clipTo
     */
-    bool getIntersectionWith (const RectangleType& rect, RectangleList& destRegion) const
+    bool getIntersectionWith (RectangleType rect, RectangleList& destRegion) const
     {
         jassert (rect.isFinite()); // You must provide a valid rectangle to this method!
 
         destRegion.clear();
 
         if (! rect.isEmpty())
-        {
-            for (int i = rects.size(); --i >= 0;)
-            {
-                auto r = rects.getReference (i);
-
+            for (auto& r : rects)
                 if (rect.intersectRectangle (r))
                     destRegion.rects.add (r);
-            }
-        }
 
-        return destRegion.rects.size() > 0;
+        return ! destRegion.isEmpty();
     }
 
     /** Swaps the contents of this and another list.
@@ -414,8 +409,8 @@ public:
     */
     bool containsPoint (Point<ValueType> point) const noexcept
     {
-        for (const RectangleType* r = rects.begin(), * const e = rects.end(); r != e; ++r)
-            if (r->contains (point))
+        for (auto& r : rects)
+            if (r.contains (point))
                 return true;
 
         return false;
@@ -435,21 +430,21 @@ public:
                     defined by this object
         @see intersectsRectangle, containsPoint
     */
-    bool containsRectangle (const RectangleType& rectangleToCheck) const
+    bool containsRectangle (RectangleType rectangleToCheck) const
     {
         if (rects.size() > 1)
         {
             RectangleList r (rectangleToCheck);
 
-            for (int i = rects.size(); --i >= 0;)
+            for (auto& rect : rects)
             {
-                r.subtract (rects.getReference (i));
+                r.subtract (rect);
 
-                if (r.rects.size() == 0)
+                if (r.isEmpty())
                     return true;
             }
         }
-        else if (rects.size() > 0)
+        else if (! isEmpty())
         {
             return rects.getReference (0).contains (rectangleToCheck);
         }
@@ -463,23 +458,22 @@ public:
                     defined by this object
         @see containsRectangle
     */
-    bool intersectsRectangle (const RectangleType& rectangleToCheck) const noexcept
+    bool intersectsRectangle (RectangleType rectangleToCheck) const noexcept
     {
-        for (const RectangleType* r = rects.begin(), * const e = rects.end(); r != e; ++r)
-            if (r->intersects (rectangleToCheck))
+        for (auto& r : rects)
+            if (r.intersects (rectangleToCheck))
                 return true;
 
         return false;
     }
 
     /** Checks whether this region intersects any part of another one.
-
         @see intersectsRectangle
     */
     bool intersects (const RectangleList& other) const noexcept
     {
-        for (const RectangleType* r = rects.begin(), * const e = rects.end(); r != e; ++r)
-            if (other.intersectsRectangle (*r))
+        for (auto& r : rects)
+            if (other.intersectsRectangle (r))
                 return true;
 
         return false;
@@ -489,24 +483,22 @@ public:
     /** Returns the smallest rectangle that can enclose the whole of this region. */
     RectangleType getBounds() const noexcept
     {
-        if (rects.size() <= 1)
-        {
-            if (rects.size() == 0)
-                return RectangleType();
+        if (isEmpty())
+            return {};
 
-            return rects.getReference (0);
-        }
+        auto& r = rects.getReference (0);
 
-        const RectangleType& r = rects.getReference (0);
+        if (rects.size() == 1)
+            return r;
 
-        ValueType minX = r.getX();
-        ValueType minY = r.getY();
-        ValueType maxX = minX + r.getWidth();
-        ValueType maxY = minY + r.getHeight();
+        auto minX = r.getX();
+        auto minY = r.getY();
+        auto maxX = minX + r.getWidth();
+        auto maxY = minY + r.getHeight();
 
         for (int i = rects.size(); --i > 0;)
         {
-            const RectangleType& r2 = rects.getReference (i);
+            auto& r2 = rects.getReference (i);
 
             minX = jmin (minX, r2.getX());
             minY = jmin (minY, r2.getY());
@@ -514,7 +506,7 @@ public:
             maxY = jmax (maxY, r2.getBottom());
         }
 
-        return RectangleType (minX, minY, maxX - minX, maxY - minY);
+        return { minX, minY, maxX - minX, maxY - minY };
     }
 
     /** Optimises the list into a minimum number of constituent rectangles.
@@ -527,19 +519,19 @@ public:
     {
         for (int i = 0; i < rects.size() - 1; ++i)
         {
-            RectangleType& r = rects.getReference (i);
-            const ValueType rx1 = r.getX();
-            const ValueType ry1 = r.getY();
-            const ValueType rx2 = rx1 + r.getWidth();
-            const ValueType ry2 = ry1 + r.getHeight();
+            auto& r = rects.getReference (i);
+            auto rx1 = r.getX();
+            auto ry1 = r.getY();
+            auto rx2 = rx1 + r.getWidth();
+            auto ry2 = ry1 + r.getHeight();
 
             for (int j = rects.size(); --j > i;)
             {
-                RectangleType& r2 = rects.getReference (j);
-                const ValueType jrx1 = r2.getX();
-                const ValueType jry1 = r2.getY();
-                const ValueType jrx2 = jrx1 + r2.getWidth();
-                const ValueType jry2 = jry1 + r2.getHeight();
+                auto& r2 = rects.getReference (j);
+                auto jrx1 = r2.getX();
+                auto jry1 = r2.getY();
+                auto jrx2 = jrx1 + r2.getWidth();
+                auto jry2 = jry1 + r2.getHeight();
 
                 // if the vertical edges of any blocks are touching and their horizontals don't
                 // line up, split them horizontally..
@@ -580,7 +572,7 @@ public:
 
         for (int i = 0; i < rects.size() - 1; ++i)
         {
-            RectangleType& r = rects.getReference (i);
+            auto& r = rects.getReference (i);
 
             for (int j = rects.size(); --j > i;)
             {
@@ -597,8 +589,8 @@ public:
     /** Adds an x and y value to all the coordinates. */
     void offsetAll (Point<ValueType> offset) noexcept
     {
-        for (RectangleType* r = rects.begin(), * const e = rects.end(); r != e; ++r)
-            *r += offset;
+        for (auto& r : rects)
+            r += offset;
     }
 
     /** Adds an x and y value to all the coordinates. */
@@ -611,8 +603,8 @@ public:
     template <typename ScaleType>
     void scaleAll (ScaleType scaleFactor) noexcept
     {
-        for (RectangleType* r = rects.begin(), * const e = rects.end(); r != e; ++r)
-            *r *= scaleFactor;
+        for (auto& r : rects)
+            r *= scaleFactor;
     }
 
     /** Applies a transform to all the rectangles.
@@ -621,8 +613,8 @@ public:
     */
     void transformAll (const AffineTransform& transform) noexcept
     {
-        for (RectangleType* r = rects.begin(), * const e = rects.end(); r != e; ++r)
-            *r = r->transformedBy (transform);
+        for (auto& r : rects)
+            r = r.transformedBy (transform);
     }
 
     //==============================================================================
@@ -631,8 +623,8 @@ public:
     {
         Path p;
 
-        for (int i = 0; i < rects.size(); ++i)
-            p.addRectangle (rects.getReference (i));
+        for (auto& r : rects)
+            p.addRectangle (r);
 
         return p;
     }
@@ -658,3 +650,5 @@ private:
     //==============================================================================
     Array<RectangleType> rects;
 };
+
+} // namespace juce

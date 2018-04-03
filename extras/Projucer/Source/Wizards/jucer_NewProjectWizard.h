@@ -32,7 +32,7 @@ static void setExecutableNameForAllTargets (Project& project, const String& exeN
 {
     for (Project::ExporterIterator exporter (project); exporter.next();)
         for (ProjectExporter::ConfigIterator config (*exporter); config.next();)
-            config->getTargetBinaryName() = exeName;
+            config->getValue (Ids::targetName) = exeName;
 }
 
 static Project::Item createSourceGroup (Project& project)
@@ -42,13 +42,16 @@ static Project::Item createSourceGroup (Project& project)
 
 static File& getLastWizardFolder()
 {
+    if (getAppSettings().lastWizardFolder.isDirectory())
+        return getAppSettings().lastWizardFolder;
+
    #if JUCE_WINDOWS
-    static File lastFolder (File::getSpecialLocation (File::userDocumentsDirectory));
+    static File lastFolderFallback (File::getSpecialLocation (File::userDocumentsDirectory));
    #else
-    static File lastFolder (File::getSpecialLocation (File::userHomeDirectory));
+    static File lastFolderFallback (File::getSpecialLocation (File::userHomeDirectory));
    #endif
 
-    return lastFolder;
+    return lastFolderFallback;
 }
 
 //==============================================================================
@@ -69,7 +72,7 @@ struct NewProjectWizard
 
     virtual StringArray getDefaultModules()
     {
-        static const char* mods[] =
+        return
         {
             "juce_core",
             "juce_events",
@@ -83,11 +86,8 @@ struct NewProjectWizard
             "juce_audio_basics",
             "juce_audio_devices",
             "juce_audio_formats",
-            "juce_audio_processors",
-            nullptr
+            "juce_audio_processors"
         };
-
-        return StringArray (mods);
     }
 
     String appTitle;
@@ -103,7 +103,8 @@ struct NewProjectWizard
     //==============================================================================
     Project* runWizard (WizardComp& wc,
                         const String& projectName,
-                        const File& target)
+                        const File& target,
+                        bool useGlobalPath)
     {
         ownerWizardComp = &wc;
         appTitle = projectName;
@@ -134,13 +135,12 @@ struct NewProjectWizard
         {
             project->setFile (projectFile);
             project->setTitle (appTitle);
-            project->getBundleIdentifier() = project->getDefaultBundleIdentifier();
 
             if (! initialiseProject (*project))
                 return nullptr;
 
             addExporters (*project, wc);
-            addDefaultModules (*project, false);
+            addDefaultModules (*project, useGlobalPath);
 
             if (project->save (false, true) != FileBasedDocument::savedOk)
                 return nullptr;
@@ -158,6 +158,11 @@ struct NewProjectWizard
             return nullptr;
         }
 
+        StringPairArray data;
+        data.set ("label", "Project Type = " + project->getProjectTypeString());
+
+        Analytics::getInstance()->logEvent ("Project Setting", data, ProjucerAnalyticsEvent::projectEvent);
+
         return project.release();
     }
 
@@ -173,7 +178,7 @@ struct NewProjectWizard
             failedFiles.add (getSourceFilesFolder().getFullPathName());
     }
 
-    void addDefaultModules (Project& project, bool areModulesCopiedLocally)
+    void addDefaultModules (Project& project, bool useGlobalPath)
     {
         StringArray mods (getDefaultModules());
 
@@ -182,7 +187,7 @@ struct NewProjectWizard
 
         for (int i = 0; i < mods.size(); ++i)
             if (const ModuleDescription* info = list.getModuleWithID (mods[i]))
-                project.getModules().addModule (info->moduleFolder, areModulesCopiedLocally);
+                project.getModules().addModule (info->moduleFolder, false, useGlobalPath);
     }
 
     void addExporters (Project& project, WizardComp& wizardComp)

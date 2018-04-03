@@ -26,15 +26,13 @@
 
 #pragma once
 
-#include "paintelements/jucer_PaintElement.h"
+#include "PaintElements/jucer_PaintElement.h"
 class JucerDocument;
 class PathPoint;
-
 
 //==============================================================================
 /**
     Contains a set of PaintElements that constitute some kind of paint() method.
-
 */
 class PaintRoutine
 {
@@ -83,6 +81,11 @@ public:
     void selectedToFront();
     void selectedToBack();
 
+    void alignTop();
+    void alignRight();
+    void alignBottom();
+    void alignLeft();
+
     void groupSelected();
     void ungroupSelected();
 
@@ -102,6 +105,8 @@ public:
     bool loadFromXml (const XmlElement& xml);
 
     void fillInGeneratedCode (GeneratedCode& code, String& paintMethodCode) const;
+
+    void applyCustomPaintSnippets (StringArray&);
 
     //==============================================================================
 private:

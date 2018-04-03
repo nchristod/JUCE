@@ -24,6 +24,9 @@
   ==============================================================================
 */
 
+namespace juce
+{
+
 extern ::Window juce_messageWindowHandle;
 
 namespace ClipboardHelpers
@@ -211,9 +214,8 @@ static ClipboardCallbackInitialiser clipboardInitialiser;
 void SystemClipboard::copyTextToClipboard (const String& clipText)
 {
     ScopedXDisplay xDisplay;
-    ::Display* display = xDisplay.get();
 
-    if (display != nullptr)
+    if (auto display = xDisplay.display)
     {
         ClipboardHelpers::initSelectionAtoms (display);
         ClipboardHelpers::localClipboardContent = clipText;
@@ -227,9 +229,8 @@ String SystemClipboard::getTextFromClipboard()
 {
     String content;
     ScopedXDisplay xDisplay;
-    ::Display* display = xDisplay.get();
 
-    if (display != nullptr)
+    if (auto display = xDisplay.display)
     {
         ClipboardHelpers::initSelectionAtoms (display);
 
@@ -275,3 +276,5 @@ String SystemClipboard::getTextFromClipboard()
 
     return content;
 }
+
+} // namespace juce

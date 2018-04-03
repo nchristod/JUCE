@@ -20,7 +20,11 @@
   ==============================================================================
 */
 
+namespace juce
+{
+
 /**
+    @tags{Blocks}
 */
 struct DrumPadGridProgram  : public Block::Program
 {
@@ -115,4 +119,8 @@ private:
     void setGridFills (int numColumns, int numRows, const juce::Array<GridFill>& fills, uint32 byteOffset);
 
     juce::String getLittleFootProgram() override;
+    juce::String getLittleFootProgramPre25() const;
+    juce::String getLittleFootProgramPost25() const;
 };
+
+} // namespace juce

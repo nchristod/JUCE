@@ -26,9 +26,9 @@
 
 #pragma once
 
-#include "../Application/jucer_OpenDocumentManager.h"
-#include "../Code Editor/jucer_SourceCodeEditor.h"
-#include "components/jucer_ComponentTypeHandler.h"
+#include "../CodeEditor/jucer_OpenDocumentManager.h"
+#include "../CodeEditor/jucer_SourceCodeEditor.h"
+#include "Components/jucer_ComponentTypeHandler.h"
 #include "jucer_PaintRoutine.h"
 #include "jucer_ComponentLayout.h"
 #include "jucer_BinaryResources.h"
@@ -36,8 +36,7 @@
 //==============================================================================
 class JucerDocument  : public ChangeBroadcaster,
                        private Timer,
-                       private CodeDocument::Listener,
-                       private OpenDocumentManager::DocumentCloseListener
+                       private CodeDocument::Listener
 {
 public:
     JucerDocument (SourceCodeDocument* cpp);
@@ -136,14 +135,17 @@ public:
 
     static bool shouldUseTransMacro() noexcept                              { return true; }
 
+    //==============================================================================
+    void refreshCustomCodeFromDocument();
+
 protected:
     SourceCodeDocument* cpp;
 
     String className, componentName, templateFile;
     String parentClasses, constructorParams, variableInitialisers;
 
-    bool fixedSize;
-    int initialWidth, initialHeight;
+    bool fixedSize = false;
+    int initialWidth = 600, initialHeight = 400;
 
     BinaryResources resources;
 
@@ -153,6 +155,8 @@ protected:
     virtual void fillInGeneratedCode (GeneratedCode&) const;
     virtual void fillInPaintCode (GeneratedCode&) const;
 
+    virtual void applyCustomPaintSnippets (StringArray&) {}
+
     static void addMethod (const String& base, const String& returnVal,
                            const String& method, const String& initialContent,
                            StringArray& baseClasses, StringArray& returnValues,
@@ -160,9 +164,9 @@ protected:
 
 private:
     UndoManager undoManager;
-    int snapGridPixels;
-    bool snapActive, snapShown;
-    float componentOverlayOpacity;
+    int snapGridPixels = 8;
+    bool snapActive = true, snapShown = true;
+    float componentOverlayOpacity = 0.33f;
     StringArray activeExtraMethods;
     ScopedPointer<XmlElement> currentXML;
     ScopedPointer<Timer> userDocChangeTimer;
@@ -171,7 +175,7 @@ private:
     void codeDocumentTextInserted (const String& newText, int insertIndex) override;
     void codeDocumentTextDeleted (int startIndex, int endIndex) override;
     void userEditedCpp();
-    bool documentAboutToClose (OpenDocumentManager::Document*) override;
+    void extractCustomPaintSnippetsFromCppFile (const String& cpp);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (JucerDocument)
 };

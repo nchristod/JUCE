@@ -24,7 +24,8 @@
   ==============================================================================
 */
 
-#pragma once
+namespace juce
+{
 
 class CodeTokeniser;
 
@@ -35,6 +36,8 @@ class CodeTokeniser;
 
     This is designed to handle syntax highlighting and fast editing of very large
     files.
+
+    @tags{GUI}
 */
 class JUCE_API  CodeEditorComponent   : public Component,
                                         public ApplicationCommandTarget,
@@ -218,8 +221,10 @@ public:
     bool isReadOnly() const noexcept                    { return readOnly; }
 
     //==============================================================================
+    /** Defines a syntax highlighting colour scheme */
     struct JUCE_API  ColourScheme
     {
+        /** Defines a colour for a token type */
         struct TokenType
         {
             String name;
@@ -228,7 +233,7 @@ public:
 
         Array<TokenType> types;
 
-        void set (const String& name, const Colour colour);
+        void set (const String& name, Colour colour);
     };
 
     /** Changes the syntax highlighting scheme.
@@ -349,7 +354,7 @@ public:
     /** @internal */
     bool isTextInputActive() const override;
     /** @internal */
-    void setTemporaryUnderlining (const Array<Range<int> >&) override;
+    void setTemporaryUnderlining (const Array<Range<int>>&) override;
     /** @internal */
     ApplicationCommandTarget* getNextCommandTarget() override;
     /** @internal */
@@ -364,18 +369,17 @@ private:
     CodeDocument& document;
 
     Font font;
-    int firstLineOnScreen, spacesPerTab;
-    float charWidth;
-    int lineHeight, linesOnScreen, columnsOnScreen;
-    int scrollbarThickness, columnToTryToMaintain;
-    bool readOnly, useSpacesForTabs, showLineNumbers, shouldFollowDocumentChanges;
-    double xOffset;
-
+    int firstLineOnScreen = 0, spacesPerTab = 4;
+    float charWidth = 0;
+    int lineHeight = 0, linesOnScreen = 0, columnsOnScreen = 0;
+    int scrollbarThickness = 16, columnToTryToMaintain = -1;
+    bool readOnly = false, useSpacesForTabs = true, showLineNumbers = false, shouldFollowDocumentChanges = false;
+    double xOffset = 0;
     CodeDocument::Position caretPos, selectionStart, selectionEnd;
 
     ScopedPointer<CaretComponent> caret;
-    ScrollBar verticalScrollBar, horizontalScrollBar;
-    ApplicationCommandManager* appCommandManager;
+    ScrollBar verticalScrollBar { true }, horizontalScrollBar { false };
+    ApplicationCommandManager* appCommandManager = nullptr;
 
     class Pimpl;
     friend class Pimpl;
@@ -394,7 +398,7 @@ private:
         draggingSelectionEnd
     };
 
-    DragType dragType;
+    DragType dragType = notDragging;
 
     //==============================================================================
     CodeTokeniser* codeTokeniser;
@@ -431,3 +435,5 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CodeEditorComponent)
 };
+
+} // namespace juce

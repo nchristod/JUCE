@@ -24,7 +24,8 @@
   ==============================================================================
 */
 
-#pragma once
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -37,13 +38,15 @@
     input to send both streams through the processor.
 
     @see AudioProcessor, AudioProcessorGraph
+
+    @tags{Audio}
 */
 class JUCE_API  AudioProcessorPlayer    : public AudioIODeviceCallback,
                                           public MidiInputCallback
 {
 public:
     //==============================================================================
-    AudioProcessorPlayer(bool doDoublePrecisionProcessing = false);
+    AudioProcessorPlayer (bool doDoublePrecisionProcessing = false);
 
     /** Destructor. */
     virtual ~AudioProcessorPlayer();
@@ -91,13 +94,13 @@ public:
 
 private:
     //==============================================================================
-    AudioProcessor* processor;
+    AudioProcessor* processor = nullptr;
     CriticalSection lock;
-    double sampleRate;
-    int blockSize;
-    bool isPrepared, isDoublePrecision;
+    double sampleRate = 0;
+    int blockSize = 0;
+    bool isPrepared = false, isDoublePrecision = false;
 
-    int numInputChans, numOutputChans;
+    int numInputChans = 0, numOutputChans = 0;
     HeapBlock<float*> channels;
     AudioBuffer<float> tempBuffer;
     AudioBuffer<double> conversionBuffer;
@@ -107,3 +110,5 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioProcessorPlayer)
 };
+
+} // namespace juce

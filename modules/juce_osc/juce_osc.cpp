@@ -35,8 +35,12 @@
 
 #include "juce_osc.h"
 
-namespace juce
-{
+#ifndef JUCE_STDLIB_HAS_STD_FUNCTION_SUPPORT
+ #ifndef JUCE_DEMO_RUNNER
+  #error "juce_osc module requires your compiler to have a newer version of the standard library"
+ #endif
+#else
+
 #include "osc/juce_OSCTypes.cpp"
 #include "osc/juce_OSCTimeTag.cpp"
 #include "osc/juce_OSCArgument.cpp"
@@ -45,4 +49,5 @@ namespace juce
 #include "osc/juce_OSCBundle.cpp"
 #include "osc/juce_OSCReceiver.cpp"
 #include "osc/juce_OSCSender.cpp"
-}
+
+#endif

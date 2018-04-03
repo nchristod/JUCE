@@ -35,7 +35,7 @@
 
   ID:               juce_osc
   vendor:           juce
-  version:          5.0.1
+  version:          5.3.0
   name:             JUCE OSC classes
   description:      Open Sound Control implementation.
   website:          http://www.juce.com/juce
@@ -54,11 +54,13 @@
 #include <juce_core/juce_core.h>
 #include <juce_events/juce_events.h>
 
+#ifndef JUCE_STDLIB_HAS_STD_FUNCTION_SUPPORT
+ #ifndef JUCE_DEMO_RUNNER
+  #error "juce_osc module requires your compiler to have a newer version of the standard library"
+ #endif
+#else
 
 //==============================================================================
-namespace juce
-{
-
 #include "osc/juce_OSCTypes.h"
 #include "osc/juce_OSCTimeTag.h"
 #include "osc/juce_OSCArgument.h"
@@ -68,4 +70,4 @@ namespace juce
 #include "osc/juce_OSCReceiver.h"
 #include "osc/juce_OSCSender.h"
 
-}
+#endif

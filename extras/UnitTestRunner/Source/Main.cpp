@@ -32,6 +32,10 @@ class ConsoleLogger : public Logger
     void logMessage (const String& message) override
     {
         std::cout << message << std::endl;
+
+       #if JUCE_WINDOWS
+        Logger::outputDebugString (message);
+       #endif
     }
 };
 
@@ -45,15 +49,19 @@ class ConsoleUnitTestRunner : public UnitTestRunner
 };
 
 //==============================================================================
-int main (int argc, char* argv[])
+int main()
 {
-    ignoreUnused (argc, argv);
-
-    ScopedPointer<ConsoleLogger> logger;
-    Logger::setCurrentLogger (logger);
+    ConsoleLogger logger;
+    Logger::setCurrentLogger (&logger);
 
     ConsoleUnitTestRunner runner;
     runner.runAllTests();
+
+    Logger::setCurrentLogger (nullptr);
+
+    for (int i = 0; i < runner.getNumResults(); ++i)
+        if (runner.getResult(i)->failures > 0)
+            return 1;
 
     return 0;
 }

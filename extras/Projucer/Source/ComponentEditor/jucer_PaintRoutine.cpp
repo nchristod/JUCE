@@ -24,21 +24,21 @@
   ==============================================================================
 */
 
-#include "../jucer_Headers.h"
+#include "../Application/jucer_Headers.h"
 #include "jucer_PaintRoutine.h"
 #include "jucer_JucerDocument.h"
 #include "jucer_ObjectTypes.h"
-#include "paintelements/jucer_PaintElementUndoableAction.h"
-#include "paintelements/jucer_PaintElementPath.h"
-#include "paintelements/jucer_PaintElementImage.h"
-#include "paintelements/jucer_PaintElementGroup.h"
-#include "ui/jucer_JucerDocumentEditor.h"
-
+#include "PaintElements/jucer_PaintElementUndoableAction.h"
+#include "PaintElements/jucer_PaintElementPath.h"
+#include "PaintElements/jucer_PaintElementImage.h"
+#include "PaintElements/jucer_PaintElementGroup.h"
+#include "UI/jucer_JucerDocumentEditor.h"
+#include "../Application/jucer_Application.h"
 
 //==============================================================================
 PaintRoutine::PaintRoutine()
     : document (nullptr),
-      backgroundColour (Colours::white)
+      backgroundColour (ProjucerApplication::getApp().lookAndFeel.findColour (backgroundColourId))
 {
     clear();
 }
@@ -293,16 +293,9 @@ void PaintRoutine::copySelectedToClipboard()
 
     XmlElement clip (clipboardXmlTag);
 
-    for (int i = 0; i < elements.size(); ++i)
-    {
-        PaintElement* const pe = elements.getUnchecked(i);
-
+    for (auto* pe : elements)
         if (selectedElements.isSelected (pe))
-        {
-            XmlElement* const e = pe->createXml();
-            clip.addChildElement (e);
-        }
-    }
+            clip.addChildElement (pe->createXml());
 
     SystemClipboard::copyTextToClipboard (clip.createDocument ("", false, false));
 }
@@ -325,8 +318,8 @@ void PaintRoutine::paste()
 
 void PaintRoutine::deleteSelected()
 {
-    const SelectedItemSet <PaintElement*> temp1 (selectedElements);
-    const SelectedItemSet <PathPoint*> temp2 (selectedPoints);
+    const SelectedItemSet<PaintElement*> temp1 (selectedElements);
+    const SelectedItemSet<PathPoint*> temp2 (selectedPoints);
 
     if (temp2.getNumSelected() > 0)
     {
@@ -369,7 +362,7 @@ void PaintRoutine::selectAll()
 
 void PaintRoutine::selectedToFront()
 {
-    const SelectedItemSet <PaintElement*> temp (selectedElements);
+    const SelectedItemSet<PaintElement*> temp (selectedElements);
 
     for (int i = temp.getNumSelected(); --i >= 0;)
         elementToFront (temp.getSelectedItem(i), true);
@@ -377,10 +370,72 @@ void PaintRoutine::selectedToFront()
 
 void PaintRoutine::selectedToBack()
 {
-    const SelectedItemSet <PaintElement*> temp (selectedElements);
+    const SelectedItemSet<PaintElement*> temp (selectedElements);
 
     for (int i = 0; i < temp.getNumSelected(); ++i)
         elementToBack (temp.getSelectedItem(i), true);
+}
+
+void PaintRoutine::alignTop()
+{
+    if (selectedElements.getNumSelected() > 1)
+    {
+        auto* main = selectedElements.getSelectedItem (0);
+        auto yPos = main->getY();
+
+        for (auto* other : selectedElements)
+        {
+            if (other != main)
+                other->setPaintElementBoundsAndProperties (other, other->getBounds().withPosition (other->getX(),
+                                                                                                   yPos), main, true);
+        }
+    }
+}
+void PaintRoutine::alignRight()
+{
+    if (selectedElements.getNumSelected() > 1)
+    {
+        auto* main = selectedElements.getSelectedItem (0);
+        auto rightPos = main->getRight();
+
+        for (auto* other : selectedElements)
+        {
+            if (other != main)
+                other->setPaintElementBoundsAndProperties (other, other->getBounds().withPosition (rightPos - other->getWidth(),
+                                                                                                   other->getY()), main, true);
+        }
+    }
+}
+
+void PaintRoutine::alignBottom()
+{
+    if (selectedElements.getNumSelected() > 1)
+    {
+        auto* main = selectedElements.getSelectedItem (0);
+        auto bottomPos = main->getBottom();
+
+        for (auto* other : selectedElements)
+        {
+            if (other != main)
+                other->setPaintElementBoundsAndProperties (other, other->getBounds().withPosition (other->getX(),
+                                                                                                   bottomPos - other->getHeight()), main, true);
+        }
+    }
+}
+void PaintRoutine::alignLeft()
+{
+    if (selectedElements.getNumSelected() > 1)
+    {
+        auto* main = selectedElements.getSelectedItem (0);
+        auto xPos = main->getX();
+
+        for (auto* other : selectedElements)
+        {
+            if (other != main)
+                other->setPaintElementBoundsAndProperties (other, other->getBounds().withPosition (xPos,
+                                                                                                   other->getY()), main, true);
+        }
+    }
 }
 
 void PaintRoutine::groupSelected()
@@ -399,11 +454,9 @@ void PaintRoutine::ungroupSelected()
 
 void PaintRoutine::bringLostItemsBackOnScreen (const Rectangle<int>& parentArea)
 {
-    for (int i = 0; i < elements.size(); ++i)
+    for (auto* c : elements)
     {
-        PaintElement* const c = elements[i];
-
-        Rectangle<int> r (c->getCurrentBounds (parentArea));
+        auto r = c->getCurrentBounds (parentArea);
 
         if (! r.intersects (parentArea))
         {
@@ -415,11 +468,9 @@ void PaintRoutine::bringLostItemsBackOnScreen (const Rectangle<int>& parentArea)
 
 void PaintRoutine::startDragging (const Rectangle<int>& parentArea)
 {
-    for (int i = 0; i < elements.size(); ++i)
+    for (auto* c : elements)
     {
-        PaintElement* const c = elements[i];
-
-        Rectangle<int> r (c->getCurrentBounds (parentArea));
+        auto r = c->getCurrentBounds (parentArea);
 
         c->getProperties().set ("xDragStart", r.getX());
         c->getProperties().set ("yDragStart", r.getY());
@@ -474,8 +525,9 @@ void PaintRoutine::fillWithBackground (Graphics& g, const bool drawOpaqueBackgro
 {
     if ((! backgroundColour.isOpaque()) && drawOpaqueBackground)
     {
-        g.fillCheckerBoard (Rectangle<int> (0, 0, g.getClipBounds().getRight(), g.getClipBounds().getBottom()),
-                            50, 50,
+        g.fillCheckerBoard (Rectangle<float> ((float) g.getClipBounds().getRight(),
+                                              (float) g.getClipBounds().getBottom()),
+                            50.0f, 50.0f,
                             Colour (0xffdddddd).overlaidWith (backgroundColour),
                             Colour (0xffffffff).overlaidWith (backgroundColour));
     }
@@ -490,8 +542,8 @@ void PaintRoutine::drawElements (Graphics& g, const Rectangle<int>& relativeTo)
     Component temp;
     temp.setBounds (relativeTo);
 
-    for (int i = 0; i < elements.size(); ++i)
-        elements.getUnchecked (i)->draw (g, getDocument()->getComponentLayout(), relativeTo);
+    for (auto* e : elements)
+        e->draw (g, getDocument()->getComponentLayout(), relativeTo);
 }
 
 //==============================================================================
@@ -501,17 +553,16 @@ void PaintRoutine::dropImageAt (const File& f, int x, int y)
 
     if (d != nullptr)
     {
-        Rectangle<float> bounds (d->getDrawableBounds());
-        d = nullptr;
+        auto bounds = d->getDrawableBounds();
+        d.reset();
 
-        PaintElement* newElement
-            = addNewElement (ObjectTypes::createNewImageElement (this), -1, true);
+        auto* newElement = addNewElement (ObjectTypes::createNewImageElement (this), -1, true);
 
-        if (PaintElementImage* pei = dynamic_cast<PaintElementImage*> (newElement))
+        if (auto* pei = dynamic_cast<PaintElementImage*> (newElement))
         {
             String resourceName (getDocument()->getResources().findUniqueName (f.getFileName()));
 
-            if (const BinaryResources::BinaryResource* existingResource = getDocument()->getResources().getResourceForFile (f))
+            if (auto* existingResource = getDocument()->getResources().getResourceForFile (f))
             {
                 resourceName = existingResource->name;
             }
@@ -546,12 +597,11 @@ const char* PaintRoutine::xmlTagName = "BACKGROUND";
 
 XmlElement* PaintRoutine::createXml() const
 {
-    XmlElement* const xml = new XmlElement (xmlTagName);
-
+    auto* xml = new XmlElement (xmlTagName);
     xml->setAttribute ("backgroundColour", backgroundColour.toString());
 
-    for (int i = 0; i < elements.size(); ++i)
-        xml->addChildElement (elements.getUnchecked (i)->createXml());
+    for (auto* e : elements)
+        xml->addChildElement (e->createXml());
 
     return xml;
 }
@@ -565,7 +615,7 @@ bool PaintRoutine::loadFromXml (const XmlElement& xml)
         clear();
 
         forEachXmlChildElement (xml, e)
-            if (PaintElement* const newElement = ObjectTypes::createElementForXml (e, this))
+            if (auto* newElement = ObjectTypes::createElementForXml (e, this))
                 elements.add (newElement);
 
         return true;
@@ -579,6 +629,12 @@ void PaintRoutine::fillInGeneratedCode (GeneratedCode& code, String& paintMethod
     if (! backgroundColour.isTransparent())
         paintMethodCode << "g.fillAll (" << CodeHelpers::colourToCode (backgroundColour) << ");\n\n";
 
-    for (int i = 0; i < elements.size(); ++i)
-        elements[i]->fillInGeneratedCode (code, paintMethodCode);
+    for (auto* e : elements)
+        e->fillInGeneratedCode (code, paintMethodCode);
+}
+
+void PaintRoutine::applyCustomPaintSnippets (StringArray& snippets)
+{
+    for (auto* e : elements)
+        e->applyCustomPaintSnippets (snippets);
 }
